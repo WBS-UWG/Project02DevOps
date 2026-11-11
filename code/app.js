@@ -23,6 +23,9 @@ const mockWatchItems = [
   { id: 4, title: "The Office", description: "Mockumentaire sur la vie de bureau de salariés ordinaires.", rate: 4, type: 2 }  // 2 = série
 ];
 
+app.get('/addItem', (req, res) => {
+    res.render('page/addItem');
+});
 
 app.get('/', (req, res) => {
   const filter = req.query.type || 'all';
