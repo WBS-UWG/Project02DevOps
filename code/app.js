@@ -15,9 +15,40 @@ app.use(session({
     saveUninitialized: false
 }));
 
-// Routes
-app.get('/', async function(req, res) {
-    res.render('page/landing');
+// Temporary item to test
+const mockWatchItems = [
+  { id: 1, title: "Inception", description: "Un voleur s'infiltre dans les rêves pour voler des secrets.", rate: 5, type: 1 }, // 1 = film
+  { id: 2, title: "Breaking Bad", description: "Un professeur de chimie devient baron de la drogue.", rate: 5, type: 2 }, // 2 = série
+  { id: 3, title: "Interstellar", description: "Une équipe d'astronautes voyage à travers un trou de ver.", rate: 4, type: 1 }, // 1 = film
+  { id: 4, title: "The Office", description: "Mockumentaire sur la vie de bureau de salariés ordinaires.", rate: 4, type: 2 }  // 2 = série
+];
+
+
+app.get('/', (req, res) => {
+  const filter = req.query.type || 'all';
+
+  const items = mockWatchItems.map(item => ({
+    ...item,
+    titre: item.title,
+    rating: item.rate,
+    type: item.type === 1 ? 'film' : 'serie'
+  }));
+
+  const filteredItems = filter === 'all'
+    ? items
+    : items.filter(item => item.type === filter);
+
+  const counts = {
+    all: items.length,
+    film: items.filter(i => i.type === 'film').length,
+    serie: items.filter(i => i.type === 'serie').length
+  };
+
+  res.render('page/landing', {
+    items: filteredItems,
+    counts,
+    filter
+  });
 });
 
 //start the web app
