@@ -1,6 +1,6 @@
 const sqlite3 = require('sqlite3').verbose();
 
-const connectToDB = function(dbPath = './account-store.db') {
+const connectToDB = function(dbPath = './filmTracker.db') {
     return new sqlite3.Database(dbPath, sqlite3.OPEN_READWRITE | sqlite3.OPEN_CREATE, 
         (err) => {
             if (err){

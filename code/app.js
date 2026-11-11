@@ -28,7 +28,6 @@ app.get('/addItem', (req, res) => {
     res.render('page/addItem', { fromWatchlist });
 });
 
-// Traitement de l'ajout d'un élément
 app.post('/addItem', (req, res) => {
   const { title, description, rate, type, from } = req.body;
 

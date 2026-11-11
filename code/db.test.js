@@ -2,12 +2,13 @@ var checker = require('./db');
 
 let db;
 
-beforeEach(() => {
+beforeEach((done) => {
     db = checker.connectToDB();
+    db.once('open', done);
 });
 
-afterEach(async () => {
-    await checker.deleteAccount(db, 'DELETE FROM account WHERE username = ?', ['testuser']).catch(() => {});
+afterEach((done) => {
+    db.close(done);
 });
 
 test('connectToDB should return a database object', () => {
