@@ -1,0 +1,182 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no">
+  <title>Comp 4420 Film Tracker - Watchlist</title>
+  <meta name="description" content="Watchlist de films et séries">
+  <meta name="author" content="William Sitt - Comp 4420">
+  <!-- Bootstrap CSS -->
+  <link href="https://stackpath.bootstrapcdn.com/bootstrap/4.2.1/css/bootstrap.min.css" rel="stylesheet">
+</head>
+<body class="bg-light">
+
+<div class="container mt-5">
+
+  <div class="d-flex flex-wrap justify-content-between align-items-center mb-4">
+    <div>
+      <h1 class="mb-1">Watchlist</h1>
+      <p class="text-muted mb-0">
+        <%= items.length %> elements to see
+      </p>
+    </div>
+    <div class="mt-3 mt-md-0">
+      <button type="button" class="btn btn-outline-info mr-2" id="surpriseMeBtn">🎲 Surprise me</button>
+      <a href="/" class="btn btn-outline-secondary mr-2">Main page</a>
+      <a href="/addItem?from=watchlist" class="btn btn-primary">+ Add an item</a>
+    </div>
+  </div>
+
+  <ul class="nav nav-pills mb-3">
+    <li class="nav-item">
+      <a class="nav-link <%= filter === 'all' ? 'active' : '' %>" href="/watchlist">
+        All <span class="badge badge-light"><%= counts.all %></span>
+      </a>
+    </li>
+    <li class="nav-item">
+      <a class="nav-link <%= filter === 'film' ? 'active' : '' %>" href="/watchlist?type=film">
+        Films <span class="badge badge-light"><%= counts.film %></span>
+      </a>
+    </li>
+    <li class="nav-item">
+      <a class="nav-link <%= filter === 'serie' ? 'active' : '' %>" href="/watchlist?type=serie">
+        Series <span class="badge badge-light"><%= counts.serie %></span>
+      </a>
+    </li>
+  </ul>
+
+  <% if (items.length === 0) { %>
+    <div class="alert alert-light border text-center">
+      No items in this category yet.
+    </div>
+  <% } else { %>
+    <div class="table-responsive">
+      <table class="table table-hover bg-white border" style="cursor: pointer;">
+        <thead class="thead-light">
+          <tr>
+            <th scope="col">Titre</th>
+            <th scope="col">Note</th>
+            <th scope="col">Description</th>
+            <th scope="col">Type</th>
+          </tr>
+        </thead>
+        <tbody>
+          <% items.forEach(function (item) { %>
+            <% const rating = Math.max(0, Math.min(5, Number(item.rating) || 0)); %>
+            <tr data-toggle="modal" data-target="#editModal" 
+                data-id="<%= item.id %>" 
+                data-title="<%= item.titre %>" 
+                data-type="<%= item.type === 'film' ? '1' : '2' %>" 
+                data-rating="<%= rating %>" 
+                data-description="<%= item.description %>">
+              <td class="font-weight-bold text-primary"><%= item.titre %></td>
+              <td class="text-nowrap" aria-label="Note <%= rating %> sur 5">
+                <span aria-hidden="true">
+                  <span class="text-warning"><%= '★'.repeat(rating) %></span><span class="text-muted"><%= '☆'.repeat(5 - rating) %></span>
+                </span>
+                <small class="text-muted ml-1"><%= rating %>/5</small>
+              </td>
+              <td><%= item.description %></td>
+              <td>
+                <% if (item.type === 'film') { %>
+                  <span class="badge badge-primary">Film</span>
+                <% } else { %>
+                  <span class="badge badge-warning">Série</span>
+                <% } %>
+              </td>
+            </tr>
+          <% }) %>
+        </tbody>
+      </table>
+    </div>
+  <% } %>
+
+</div>
+
+<div class="modal fade" id="editModal" tabindex="-1" role="dialog" aria-labelledby="editModalLabel" aria-hidden="true">
+  <div class="modal-dialog" role="document">
+    <div class="modal-content">
+      <form action="/items/update" method="POST">
+        <div class="modal-header">
+          <h5 class="modal-title" id="editModalLabel">Modifier / Voir l'élément</h5>
+          <button type="button" class="close" data-dismiss="modal" aria-label="Close">
+            <span aria-hidden="true">&times;</span>
+          </button>
+        </div>
+        <div class="modal-body">
+          <input type="hidden" id="modal-id" name="id">
+          
+          <div class="form-group">
+            <label for="modal-title">Titre</label>
+            <input type="text" class="form-control" id="modal-title" name="title" required>
+          </div>
+
+          <div class="form-group">
+            <label for="modal-type">Type</label>
+            <select class="form-control" id="modal-type" name="type">
+              <option value="1">Film</option>
+              <option value="2">Série</option>
+            </select>
+          </div>
+
+          <div class="form-group">
+            <label for="modal-rating">Note (sur 5)</label>
+            <select class="form-control" id="modal-rating" name="rate">
+              <option value="5">5/5</option>
+              <option value="4">4/5</option>
+              <option value="3">3/5</option>
+              <option value="2">2/5</option>
+              <option value="1">1/5</option>
+            </select>
+          </div>
+
+          <div class="form-group">
+            <label for="modal-description">Description</label>
+            <textarea class="form-control" id="modal-description" name="description" rows="3"></textarea>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-secondary" data-dismiss="modal">Fermer</button>
+          <button type="submit" class="btn btn-primary">Enregistrer les modifications</button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+
+<script src="https://code.jquery.com/jquery-3.3.1.slim.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/popper.js/1.14.6/umd/popper.min.js"></script>
+<script src="https://stackpath.bootstrapcdn.com/bootstrap/4.2.1/js/bootstrap.min.js"></script>
+
+<script>
+  $('#editModal').on('show.bs.modal', function (event) {
+    var button = $(event.relatedTarget);
+    var id = button.data('id');
+    var title = button.data('title');
+    var type = button.data('type');
+    var rating = button.data('rating');
+    var description = button.data('description');
+
+    var modal = $(this);
+    modal.find('#modal-id').val(id);
+    modal.find('#modal-title').val(title);
+    modal.find('#modal-type').val(type);
+    modal.find('#modal-rating').val(rating);
+    modal.find('#modal-description').val(description);
+  });
+
+  $('#surpriseMeBtn').on('click', function() {
+    var rows = $('tbody tr');
+    if (rows.length === 0) {
+      alert("Aucun élément dans la watchlist pour être surpris !");
+      return;
+    }
+    var randomIndex = Math.floor(Math.random() * rows.length);
+    var randomRow = $(rows[randomIndex]);
+    
+    randomRow.click();
+  });
+</script>
+
+</body>
+</html>
