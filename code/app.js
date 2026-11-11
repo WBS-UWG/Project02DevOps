@@ -15,22 +15,76 @@ app.use(session({
     saveUninitialized: false
 }));
 
-// Temporary item to test
-const mockWatchItems = [
-  { id: 1, title: "Inception", description: "Un voleur s'infiltre dans les rêves pour voler des secrets.", rate: 5, type: 1 }, // 1 = film
-  { id: 2, title: "Breaking Bad", description: "Un professeur de chimie devient baron de la drogue.", rate: 5, type: 2 }, // 2 = série
-  { id: 3, title: "Interstellar", description: "Une équipe d'astronautes voyage à travers un trou de ver.", rate: 4, type: 1 }, // 1 = film
-  { id: 4, title: "The Office", description: "Mockumentaire sur la vie de bureau de salariés ordinaires.", rate: 4, type: 2 }  // 2 = série
+let mockWatchItems = [
+  { id: 1, title: "Inception", description: "Un voleur s'infiltre dans les rêves pour voler des secrets.", rate: 5, type: 1, watchlist: 0 }, 
+  { id: 2, title: "Ready player one", description: "Le futur du jeu video", rate: 5, type: 2, watchlist: 0 }, 
+  { id: 3, title: "Breaking Bad", description: "Un professeur de chimie devient baron de la drogue.", rate: 5, type: 2, watchlist: 1 },
+  { id: 4, title: "Interstellar", description: "Une équipe d'astronautes voyage à travers un trou de ver.", rate: 4, type: 1, watchlist: 0 }, 
+  { id: 5, title: "The Office", description: "Mockumentaire sur la vie de bureau de salariés ordinaires.", rate: 4, type: 2, watchlist: 1 }
 ];
 
 app.get('/addItem', (req, res) => {
-    res.render('page/addItem');
+    const fromWatchlist = req.query.from === 'watchlist';
+    res.render('page/addItem', { fromWatchlist });
+});
+
+// Traitement de l'ajout d'un élément
+app.post('/addItem', (req, res) => {
+  const { title, description, rate, type, from } = req.body;
+
+  const newItem = {
+    id: mockWatchItems.length + 1,
+    title: title ? title.trim() : "Sans titre",
+    description: description ? description.trim() : "",
+    rate: parseInt(rate, 10) || 3,
+    type: parseInt(type, 10) || 1,
+    watchlist: from === 'watchlist' ? 1 : 0
+  };
+
+  mockWatchItems.push(newItem);
+
+  if (from === 'watchlist') {
+    res.redirect('/watchlist');
+  } else {
+    res.redirect('/');
+  }
+});
+
+app.get('/watchlist', (req, res) => {
+  const filter = req.query.type || 'all';
+
+  let watchlistItems = mockWatchItems.filter(item => item.watchlist === 1);
+
+  const items = watchlistItems.map(item => ({
+    ...item,
+    titre: item.title,
+    rating: item.rate,
+    type: item.type === 1 ? 'film' : 'serie'
+  }));
+
+  const filteredItems = filter === 'all'
+    ? items
+    : items.filter(item => item.type === filter);
+
+  const counts = {
+    all: items.length,
+    film: items.filter(i => i.type === 'film').length,
+    serie: items.filter(i => i.type === 'serie').length
+  };
+
+  res.render('page/watchlist', {
+    items: filteredItems,
+    counts,
+    filter
+  });
 });
 
 app.get('/', (req, res) => {
   const filter = req.query.type || 'all';
 
-  const items = mockWatchItems.map(item => ({
+  let landingItems = mockWatchItems.filter(item => item.watchlist === 0);
+
+  const items = landingItems.map(item => ({
     ...item,
     titre: item.title,
     rating: item.rate,
@@ -54,7 +108,7 @@ app.get('/', (req, res) => {
   });
 });
 
-//start the web app
+// Start the web app
 app.listen(8080, function () {
     console.log('App listening on port 8080!');
 });
