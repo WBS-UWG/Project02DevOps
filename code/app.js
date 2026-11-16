@@ -1,27 +1,43 @@
 var express = require('express');
-var session = require('express-session');
 var bodyParser = require('body-parser');
-const { connectToDB, closeDB } = require('./db');
+const { connectToDB, closeDB, initDB, getItems, addItem } = require('./db');
 
 var app = express();
 
 app.set('view engine', 'ejs');
-app.use(bodyParser.urlencoded({ extended: true })); 
+app.use(bodyParser.urlencoded({ extended: true }));
 app.use(express.static('public'));
 
-app.use(session({
-    secret: '9087e7fbede17275cfafcf0319ce2baadffe8f27ba8589a21dd6772440bb3150',
-    resave: false,
-    saveUninitialized: false
-}));
 
-let mockWatchItems = [
-  { id: 1, title: "Inception", description: "Un voleur s'infiltre dans les rêves pour voler des secrets.", rate: 5, type: 1, watchlist: 0 }, 
-  { id: 2, title: "Ready player one", description: "Le futur du jeu video", rate: 5, type: 2, watchlist: 0 }, 
-  { id: 3, title: "Breaking Bad", description: "Un professeur de chimie devient baron de la drogue.", rate: 5, type: 2, watchlist: 1 },
-  { id: 4, title: "Interstellar", description: "Une équipe d'astronautes voyage à travers un trou de ver.", rate: 4, type: 1, watchlist: 0 }, 
-  { id: 5, title: "The Office", description: "Mockumentaire sur la vie de bureau de salariés ordinaires.", rate: 4, type: 2, watchlist: 1 }
-];
+const db = connectToDB();
+initDB(db);
+
+function renderItemsPage(view, watchlistValue) {
+  return (req, res) => {
+    const filter = req.query.type || 'all';
+
+    getItems(db, watchlistValue, (err, rows) => {
+      if (err) {
+        console.error('Error reading DB:', err.message);
+        return res.status(500).send('Error while reading the database.');
+      }
+
+      const items = rows.map(item => ({...item, titre: item.title, description: item.description,
+        rating: item.rate, type: item.type === 1 ? 'film' : 'serie'
+      }));
+
+      const filteredItems = filter === 'all' ? items : items.filter(item => item.type === filter);
+
+      const counts = {
+        all: items.length,
+        film: items.filter(i => i.type === 'film').length,
+        serie: items.filter(i => i.type === 'serie').length
+      };
+
+      res.render(view, {items: filteredItems, counts, filter});
+    });
+  };
+}
 
 app.get('/addItem', (req, res) => {
     const fromWatchlist = req.query.from === 'watchlist';
@@ -32,80 +48,24 @@ app.post('/addItem', (req, res) => {
   const { title, description, rate, type, from } = req.body;
 
   const newItem = {
-    id: mockWatchItems.length + 1,
-    title: title ? title.trim() : "Sans titre",
+    title: title ? title.trim() : "No Title",
     description: description ? description.trim() : "",
-    rate: parseInt(rate, 10) || 3,
+    rate: from === 'watchlist' ? null : (parseInt(rate, 10) || 3),
     type: parseInt(type, 10) || 1,
     watchlist: from === 'watchlist' ? 1 : 0
   };
 
-  mockWatchItems.push(newItem);
-
-  if (from === 'watchlist') {
-    res.redirect('/watchlist');
-  } else {
-    res.redirect('/');
-  }
-});
-
-app.get('/watchlist', (req, res) => {
-  const filter = req.query.type || 'all';
-
-  let watchlistItems = mockWatchItems.filter(item => item.watchlist === 1);
-
-  const items = watchlistItems.map(item => ({
-    ...item,
-    titre: item.title,
-    rating: item.rate,
-    type: item.type === 1 ? 'film' : 'serie'
-  }));
-
-  const filteredItems = filter === 'all'
-    ? items
-    : items.filter(item => item.type === filter);
-
-  const counts = {
-    all: items.length,
-    film: items.filter(i => i.type === 'film').length,
-    serie: items.filter(i => i.type === 'serie').length
-  };
-
-  res.render('page/watchlist', {
-    items: filteredItems,
-    counts,
-    filter
+  addItem(db, newItem, (err) => {
+    if (err) {
+      console.error('Error inserting into DB:', err.message);
+      return res.status(500).send("Error while adding the item.");
+    }
+    res.redirect(from === 'watchlist' ? '/watchlist' : '/');
   });
 });
 
-app.get('/', (req, res) => {
-  const filter = req.query.type || 'all';
-
-  let landingItems = mockWatchItems.filter(item => item.watchlist === 0);
-
-  const items = landingItems.map(item => ({
-    ...item,
-    titre: item.title,
-    rating: item.rate,
-    type: item.type === 1 ? 'film' : 'serie'
-  }));
-
-  const filteredItems = filter === 'all'
-    ? items
-    : items.filter(item => item.type === filter);
-
-  const counts = {
-    all: items.length,
-    film: items.filter(i => i.type === 'film').length,
-    serie: items.filter(i => i.type === 'serie').length
-  };
-
-  res.render('page/landing', {
-    items: filteredItems,
-    counts,
-    filter
-  });
-});
+app.get('/watchlist', renderItemsPage('page/watchlist', 1));
+app.get('/', renderItemsPage('page/landing', 0));
 
 // Start the web app
 app.listen(8080, function () {

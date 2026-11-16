@@ -21,7 +21,43 @@ const closeDB = function(db) {
     });
 };
 
+const initDB = function(db) {
+    db.serialize(() => {
+        db.run(`
+            CREATE TABLE IF NOT EXISTS watch_items (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                title TEXT NOT NULL,
+                description TEXT DEFAULT '',
+                rate INTEGER DEFAULT 3,
+                type INTEGER DEFAULT 1,      -- 1 = film, 2 = série
+                watchlist INTEGER DEFAULT 0  -- 0 = accueil, 1 = watchlist
+            )
+        `);
+    });
+};
+
+const getItems = function(db, watchlist, callback) {
+    db.all(
+        'SELECT * FROM watch_items WHERE watchlist = ? ORDER BY id',
+        [watchlist],
+        callback
+    );
+};
+
+const addItem = function(db, item, callback) {
+    db.run(
+        'INSERT INTO watch_items (title, description, rate, type, watchlist) VALUES (?, ?, ?, ?, ?)',
+        [item.title, item.description, item.rate, item.type, item.watchlist],
+        function(err) {
+            callback(err, this ? this.lastID : null);
+        }
+    );
+};
+
 module.exports = {
     connectToDB,
     closeDB,
+    initDB,
+    getItems,
+    addItem,
 };
