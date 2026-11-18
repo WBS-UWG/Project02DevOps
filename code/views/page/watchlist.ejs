@@ -65,7 +65,9 @@
                 data-id="<%= item.id %>" 
                 data-title="<%= item.titre %>" 
                 data-type="<%= item.type === 'film' ? '1' : '2' %>" 
-                data-description="<%= item.description %>">
+                data-description="<%= item.description %>"
+                data-rate="<%= item.rate %>"
+                data-watchlist="<%= item.watchlist %>">
               <td class="font-weight-bold text-primary"><%= item.titre %></td>
               <td><%= item.description %></td>
               <td>
@@ -111,6 +113,19 @@
           </div>
 
           <div class="form-group">
+            <label for="modal-rate">Note (1 to 5)</label>
+            <input type="number" class="form-control" id="modal-rate" name="rate" min="1" max="5">
+          </div>
+
+          <div class="form-group">
+            <label for="modal-watchlist">Storage location</label>
+            <select class="form-control" id="modal-watchlist" name="watchlist">
+              <option value="0">Watched</option>
+              <option value="1">whishlist</option>
+            </select>
+          </div>
+
+          <div class="form-group">
             <label for="modal-description">Description</label>
             <textarea class="form-control" id="modal-description" name="description" rows="3"></textarea>
           </div>
@@ -139,12 +154,16 @@
     var title = button.data('title');
     var type = button.data('type');
     var description = button.data('description');
+    var rate = button.data('rate');
+    var watchlist = button.data('watchlist');
 
     var modal = $(this);
     modal.find('#modal-id').val(id);
     modal.find('#modal-title').val(title);
     modal.find('#modal-type').val(type);
     modal.find('#modal-description').val(description);
+    modal.find('#modal-rate').val(rate);
+    modal.find('#modal-watchlist').val(watchlist);
   });
 
   $('#surpriseMeBtn').on('click', function() {

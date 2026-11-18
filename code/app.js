@@ -1,6 +1,6 @@
 var express = require('express');
 var bodyParser = require('body-parser');
-const { connectToDB, closeDB, initDB, getItems, addItem, deleteItem } = require('./db');
+const { connectToDB, closeDB, initDB, getItems, addItem, deleteItem, updateItem } = require('./db');
 
 var app = express();
 
@@ -74,6 +74,32 @@ app.post('/items/delete', (req, res) => {
     if (err) {
       console.error('Error deleting item:', err.message);
       return res.status(500).send('Error while deleting the item.');
+    }
+    res.redirect('/watchlist');
+  });
+});
+
+app.post('/items/update', (req, res) => {
+  const id = Number.parseInt(req.body.id, 10);
+  const { title, description, rate, type, watchlist } = req.body;
+
+  if (!Number.isInteger(id) || id <= 0) {
+    return res.status(400).send('Invalid item ID.');
+  }
+
+  const updatedItem = {
+    id: id,
+    title: title ? title.trim() : "No Title",
+    description: description ? description.trim() : "",
+    rate: parseInt(rate, 10) || 3,
+    type: parseInt(type, 10) || 1,
+    watchlist: parseInt(watchlist, 10) === 1 ? 1 : 0
+  };
+
+  updateItem(db, updatedItem, (err) => {
+    if (err) {
+      console.error('Error updating item:', err.message);
+      return res.status(500).send('Error while updating the item.');
     }
     res.redirect('/watchlist');
   });

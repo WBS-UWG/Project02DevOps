@@ -64,11 +64,22 @@ const deleteItem = function(db, id, callback) {
     );
 };
 
+const updateItem = function(db, item, callback) {
+    db.run(
+        'UPDATE watch_items SET title = ?, description = ?, rate = ?, type = ?, watchlist = ? WHERE id = ?',
+        [item.title, item.description, item.rate, item.type, item.watchlist, item.id],
+        function(err) {
+            callback(err, this ? this.changes : 0);
+        }
+    );
+};
+
 module.exports = {
     connectToDB,
     closeDB,
     initDB,
     getItems,
     addItem,
+    updateItem,
     deleteItem,
 };
