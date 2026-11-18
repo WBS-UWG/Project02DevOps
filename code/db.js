@@ -36,6 +36,40 @@ const initDB = function(db) {
     });
 };
 
+const validationError = (message) => new Error(`Invalid watch item: ${message}`);
+
+const validateItem = (item, requireId = false) => {
+    if (!item || typeof item !== 'object' || Array.isArray(item)) {
+        return validationError('item must be an object');
+    }
+
+    if (typeof item.title !== 'string' || item.title.trim().length === 0) {
+        return validationError('title must be a non-empty string');
+    }
+
+    if (!Number.isInteger(item.rate) || item.rate < 0 || item.rate > 5) {
+        return validationError('rate must be an integer between 0 and 5');
+    }
+
+    if (!Number.isInteger(item.type) || (item.type !== 0 && item.type !== 1)) {
+        return validationError('type must be 0 or 1');
+    }
+
+    if (!Number.isInteger(item.watchlist) || (item.watchlist !== 0 && item.watchlist !== 1)) {
+        return validationError('watchlist must be 0 or 1');
+    }
+
+    if (requireId && (!Number.isInteger(item.id) || item.id <= 0)) {
+        return validationError('id must be a positive integer');
+    }
+
+    return null;
+};
+
+const reject = (callback, error) => {
+    process.nextTick(() => callback(error, 0));
+};
+
 const getItems = function(db, watchlist, callback) {
     db.all(
         'SELECT * FROM watch_items WHERE watchlist = ? ORDER BY id',
@@ -45,6 +79,11 @@ const getItems = function(db, watchlist, callback) {
 };
 
 const addItem = function(db, item, callback) {
+    const error = validateItem(item);
+    if (error) {
+        return reject(callback, error);
+    }
+
     db.run(
         'INSERT INTO watch_items (title, description, rate, type, watchlist) VALUES (?, ?, ?, ?, ?)',
         [item.title, item.description, item.rate, item.type, item.watchlist],
@@ -65,6 +104,11 @@ const deleteItem = function(db, id, callback) {
 };
 
 const updateItem = function(db, item, callback) {
+    const error = validateItem(item, true);
+    if (error) {
+        return reject(callback, error);
+    }
+
     db.run(
         'UPDATE watch_items SET title = ?, description = ?, rate = ?, type = ?, watchlist = ? WHERE id = ?',
         [item.title, item.description, item.rate, item.type, item.watchlist, item.id],
