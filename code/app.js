@@ -1,6 +1,6 @@
 var express = require('express');
 var bodyParser = require('body-parser');
-const { connectToDB, closeDB, initDB, getItems, addItem } = require('./db');
+const { connectToDB, closeDB, initDB, getItems, addItem, deleteItem } = require('./db');
 
 var app = express();
 
@@ -61,6 +61,21 @@ app.post('/addItem', (req, res) => {
       return res.status(500).send("Error while adding the item.");
     }
     res.redirect(from === 'watchlist' ? '/watchlist' : '/');
+  });
+});
+
+app.post('/items/delete', (req, res) => {
+  const id = Number.parseInt(req.body.id, 10);
+  if (!Number.isInteger(id) || id <= 0) {
+    return res.status(400).send('Invalid item ID.');
+  }
+
+  deleteItem(db, id, (err) => {
+    if (err) {
+      console.error('Error deleting item:', err.message);
+      return res.status(500).send('Error while deleting the item.');
+    }
+    res.redirect('/watchlist');
   });
 });
 

@@ -55,27 +55,18 @@
         <thead class="thead-light">
           <tr>
             <th scope="col">Titre</th>
-            <th scope="col">Note</th>
             <th scope="col">Description</th>
             <th scope="col">Type</th>
           </tr>
         </thead>
         <tbody>
           <% items.forEach(function (item) { %>
-            <% const rating = Math.max(0, Math.min(5, Number(item.rating) || 0)); %>
             <tr data-toggle="modal" data-target="#editModal" 
                 data-id="<%= item.id %>" 
                 data-title="<%= item.titre %>" 
                 data-type="<%= item.type === 'film' ? '1' : '2' %>" 
-                data-rating="<%= rating %>" 
                 data-description="<%= item.description %>">
               <td class="font-weight-bold text-primary"><%= item.titre %></td>
-              <td class="text-nowrap" aria-label="Note <%= rating %> sur 5">
-                <span aria-hidden="true">
-                  <span class="text-warning"><%= '★'.repeat(rating) %></span><span class="text-muted"><%= '☆'.repeat(5 - rating) %></span>
-                </span>
-                <small class="text-muted ml-1"><%= rating %>/5</small>
-              </td>
               <td><%= item.description %></td>
               <td>
                 <% if (item.type === 'film') { %>
@@ -120,24 +111,17 @@
           </div>
 
           <div class="form-group">
-            <label for="modal-rating">Note (sur 5)</label>
-            <select class="form-control" id="modal-rating" name="rate">
-              <option value="5">5/5</option>
-              <option value="4">4/5</option>
-              <option value="3">3/5</option>
-              <option value="2">2/5</option>
-              <option value="1">1/5</option>
-            </select>
-          </div>
-
-          <div class="form-group">
             <label for="modal-description">Description</label>
             <textarea class="form-control" id="modal-description" name="description" rows="3"></textarea>
           </div>
         </div>
         <div class="modal-footer">
-          <button type="button" class="btn btn-secondary" data-dismiss="modal">Fermer</button>
-          <button type="submit" class="btn btn-primary">Enregistrer les modifications</button>
+          <button type="button" class="btn btn-secondary" data-dismiss="modal">Close</button>
+          <button type="submit" class="btn btn-danger" formaction="/items/delete" formmethod="POST"
+                  onclick="return confirm('Voulez-vous vraiment supprimer cet élément de la watchlist ?');">
+            Supprimer
+          </button>
+          <button type="submit" class="btn btn-primary">Save the modification</button>
         </div>
       </form>
     </div>
@@ -154,14 +138,12 @@
     var id = button.data('id');
     var title = button.data('title');
     var type = button.data('type');
-    var rating = button.data('rating');
     var description = button.data('description');
 
     var modal = $(this);
     modal.find('#modal-id').val(id);
     modal.find('#modal-title').val(title);
     modal.find('#modal-type').val(type);
-    modal.find('#modal-rating').val(rating);
     modal.find('#modal-description').val(description);
   });
 

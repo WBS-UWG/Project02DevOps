@@ -54,10 +54,21 @@ const addItem = function(db, item, callback) {
     );
 };
 
+const deleteItem = function(db, id, callback) {
+    db.run(
+        'DELETE FROM watch_items WHERE id = ? AND watchlist = 1',
+        [id],
+        function(err) {
+            callback(err, this ? this.changes : 0);
+        }
+    );
+};
+
 module.exports = {
     connectToDB,
     closeDB,
     initDB,
     getItems,
     addItem,
+    deleteItem,
 };
