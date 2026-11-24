@@ -21,7 +21,11 @@ const closeDB = function(db) {
     });
 };
 
-const initDB = function(db) {
+const initDB = function(db, callback = (err) => {
+    if (err) {
+        console.error('Database initialization error:', err.message);
+    }
+}) {
     db.serialize(() => {
         db.run(`
             CREATE TABLE IF NOT EXISTS watch_items (
@@ -30,9 +34,40 @@ const initDB = function(db) {
                 description TEXT DEFAULT '',
                 rate INTEGER DEFAULT 3,
                 type INTEGER DEFAULT 1,      -- 1 = film, 2 = série
-                watchlist INTEGER DEFAULT 0  -- 0 = accueil, 1 = watchlist
+                watchlist INTEGER DEFAULT 0, -- 0 = accueil, 1 = watchlist
+                season INTEGER,
+                episode INTEGER
             )
-        `);
+        `, (createError) => {
+            if (createError) {
+                return callback(createError);
+            }
+
+            db.all('PRAGMA table_info(watch_items)', (pragmaError, columns) => {
+                if (pragmaError) {
+                    return callback(pragmaError);
+                }
+
+                const existingColumns = new Set(columns.map(column => column.name));
+                const missingColumns = ['season', 'episode'].filter(column => !existingColumns.has(column));
+
+                const addNextColumn = () => {
+                    const column = missingColumns.shift();
+                    if (!column) {
+                        return callback(null);
+                    }
+
+                    db.run(`ALTER TABLE watch_items ADD COLUMN ${column} INTEGER`, (alterError) => {
+                        if (alterError) {
+                            return callback(alterError);
+                        }
+                        addNextColumn();
+                    });
+                };
+
+                addNextColumn();
+            });
+        });
     });
 };
 
@@ -51,8 +86,8 @@ const validateItem = (item, requireId = false) => {
         return validationError('rate must be an integer between 0 and 5');
     }
 
-    if (!Number.isInteger(item.type) || (item.type !== 0 && item.type !== 1)) {
-        return validationError('type must be 0 or 1');
+    if (!Number.isInteger(item.type) || ![0, 1, 2].includes(item.type)) {
+        return validationError('type must be 0, 1, or 2');
     }
 
     if (!Number.isInteger(item.watchlist) || (item.watchlist !== 0 && item.watchlist !== 1)) {
@@ -61,6 +96,18 @@ const validateItem = (item, requireId = false) => {
 
     if (requireId && (!Number.isInteger(item.id) || item.id <= 0)) {
         return validationError('id must be a positive integer');
+    }
+
+    const season = item.season === undefined ? null : item.season;
+    const episode = item.episode === undefined ? null : item.episode;
+    if (season !== null && (!Number.isInteger(season) || season < 1)) {
+        return validationError('season must be a positive integer or null');
+    }
+    if (episode !== null && (!Number.isInteger(episode) || episode < 1)) {
+        return validationError('episode must be a positive integer or null');
+    }
+    if (episode !== null && season === null) {
+        return validationError('episode requires a season');
     }
 
     return null;
@@ -85,8 +132,8 @@ const addItem = function(db, item, callback) {
     }
 
     db.run(
-        'INSERT INTO watch_items (title, description, rate, type, watchlist) VALUES (?, ?, ?, ?, ?)',
-        [item.title, item.description, item.rate, item.type, item.watchlist],
+        'INSERT INTO watch_items (title, description, rate, type, watchlist, season, episode) VALUES (?, ?, ?, ?, ?, ?, ?)',
+        [item.title, item.description, item.rate, item.type, item.watchlist, item.season ?? null, item.episode ?? null],
         function(err) {
             callback(err, this ? this.lastID : null);
         }
@@ -110,8 +157,31 @@ const updateItem = function(db, item, callback) {
     }
 
     db.run(
-        'UPDATE watch_items SET title = ?, description = ?, rate = ?, type = ?, watchlist = ? WHERE id = ?',
-        [item.title, item.description, item.rate, item.type, item.watchlist, item.id],
+        'UPDATE watch_items SET title = ?, description = ?, rate = ?, type = ?, watchlist = ?, season = ?, episode = ? WHERE id = ?',
+        [item.title, item.description, item.rate, item.type, item.watchlist, item.season ?? null, item.episode ?? null, item.id],
+        function(err) {
+            callback(err, this ? this.changes : 0);
+        }
+    );
+};
+
+const updateSeriesProgress = function(db, id, season, episode, callback) {
+    if (!Number.isInteger(id) || id <= 0) {
+        return reject(callback, validationError('id must be a positive integer'));
+    }
+    if (season !== null && (!Number.isInteger(season) || season < 1)) {
+        return reject(callback, validationError('season must be a positive integer or null'));
+    }
+    if (episode !== null && (!Number.isInteger(episode) || episode < 1)) {
+        return reject(callback, validationError('episode must be a positive integer or null'));
+    }
+    if (episode !== null && season === null) {
+        return reject(callback, validationError('episode requires a season'));
+    }
+
+    db.run(
+        'UPDATE watch_items SET season = ?, episode = ? WHERE id = ? AND watchlist = 0 AND type IN (0, 2)',
+        [season, episode, id],
         function(err) {
             callback(err, this ? this.changes : 0);
         }
@@ -125,5 +195,6 @@ module.exports = {
     getItems,
     addItem,
     updateItem,
+    updateSeriesProgress,
     deleteItem,
 };

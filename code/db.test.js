@@ -20,8 +20,10 @@ const countRows = (callback) => {
 
 beforeEach((done) => {
     db = checker.connectToDB(':memory:');
-    checker.initDB(db);
-    setTimeout(done, 10);
+    checker.initDB(db, (err) => {
+        expect(err).toBeNull();
+        done();
+    });
 });
 
 afterEach((done) => {
@@ -34,6 +36,32 @@ afterEach((done) => {
 // ---------------------------------------------------------------------------
 test('connectToDB should return a database object', () => {
     expect(db).toBeDefined();
+});
+
+test('initDB should add progress columns to an existing database', (done) => {
+    const legacyDb = checker.connectToDB(':memory:');
+    legacyDb.run(`
+        CREATE TABLE watch_items (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            title TEXT NOT NULL,
+            description TEXT DEFAULT '',
+            rate INTEGER DEFAULT 3,
+            type INTEGER DEFAULT 1,
+            watchlist INTEGER DEFAULT 0
+        )
+    `, (createError) => {
+        expect(createError).toBeNull();
+
+        checker.initDB(legacyDb, (initError) => {
+            expect(initError).toBeNull();
+            legacyDb.all('PRAGMA table_info(watch_items)', (pragmaError, columns) => {
+                expect(pragmaError).toBeNull();
+                expect(columns.map(column => column.name)).toEqual(expect.arrayContaining(['season', 'episode']));
+                checker.closeDB(legacyDb);
+                done();
+            });
+        });
+    });
 });
 
 // ---------------------------------------------------------------------------
@@ -85,11 +113,23 @@ test.each([
     });
 });
 
-test.each([0, 1])('addItem should accept the valid type %p', (type, done) => {
+test.each([0, 1, 2])('addItem should accept the valid type %p', (type, done) => {
     checker.addItem(db, validItem({ type }), (err, lastID) => {
         expect(err).toBeNull();
         expect(lastID).toBeGreaterThan(0);
         done();
+    });
+});
+
+test('addItem should save a series season and episode', (done) => {
+    checker.addItem(db, validItem({ type: 2, season: 3, episode: 7 }), (err, id) => {
+        expect(err).toBeNull();
+
+        db.get('SELECT season, episode FROM watch_items WHERE id = ?', [id], (err, row) => {
+            expect(err).toBeNull();
+            expect(row).toEqual({ season: 3, episode: 7 });
+            done();
+        });
     });
 });
 
@@ -152,6 +192,24 @@ describe('addItem with invalid data', () => {
         const item = validItem();
         delete item.type;
         expectRejected(item, done);
+    });
+
+    test.each([0, -1, 1.5, '2', 'invalid'])(
+        'should reject an invalid season %p',
+        (season, done) => {
+            expectRejected(validItem({ type: 2, season }), done);
+        }
+    );
+
+    test.each([0, -1, 1.5, '2', 'invalid'])(
+        'should reject an invalid episode %p',
+        (episode, done) => {
+            expectRejected(validItem({ type: 2, season: 1, episode }), done);
+        }
+    );
+
+    test('should reject an episode when no season is provided', (done) => {
+        expectRejected(validItem({ type: 2, episode: 1 }), done);
     });
 
     test.each([
@@ -359,7 +417,8 @@ test.each([
     [0, 0, 0],
     [3, 0, 1],
     [5, 1, 0],
-    [2, 1, 1]
+    [2, 1, 1],
+    [4, 2, 1]
 ])('updateItem should persist valid values rate=%p, type=%p, watchlist=%p', (rate, type, watchlist, done) => {
     checker.addItem(db, validItem(), (err, id) => {
         expect(err).toBeNull();
@@ -379,6 +438,54 @@ test.each([
                 expect(err).toBeNull();
                 expect(row).toEqual({ rate, type, watchlist });
                 done();
+            });
+        });
+    });
+});
+
+test('updateItem should save a series season and episode', (done) => {
+    checker.addItem(db, validItem({ type: 2 }), (err, id) => {
+        expect(err).toBeNull();
+
+        checker.updateItem(db, {
+            ...validItem({ type: 2, season: 4, episode: 2 }),
+            id
+        }, (err, changes) => {
+            expect(err).toBeNull();
+
+            db.get('SELECT season, episode FROM watch_items WHERE id = ?', [id], (err, row) => {
+                expect(err).toBeNull();
+                expect(row).toEqual({ season: 4, episode: 2 });
+                done();
+            });
+        });
+    });
+});
+
+test('updateSeriesProgress should update only series on the main page', (done) => {
+    checker.addItem(db, validItem({ type: 2, watchlist: 0 }), (err, mainId) => {
+        expect(err).toBeNull();
+        checker.addItem(db, validItem({ title: 'Watchlist series', type: 2, watchlist: 1 }), (watchlistErr, watchlistId) => {
+            expect(watchlistErr).toBeNull();
+
+            checker.updateSeriesProgress(db, mainId, 3, 5, (updateError, changes) => {
+                expect(updateError).toBeNull();
+                expect(changes).toBe(1);
+
+                checker.updateSeriesProgress(db, watchlistId, 3, 5, (watchlistUpdateError, watchlistChanges) => {
+                    expect(watchlistUpdateError).toBeNull();
+                    expect(watchlistChanges).toBe(0);
+
+                    db.get('SELECT season, episode FROM watch_items WHERE id = ?', [mainId], (mainReadError, mainRow) => {
+                        expect(mainReadError).toBeNull();
+                        expect(mainRow).toEqual({ season: 3, episode: 5 });
+                        db.get('SELECT season, episode FROM watch_items WHERE id = ?', [watchlistId], (watchlistReadError, watchlistRow) => {
+                            expect(watchlistReadError).toBeNull();
+                            expect(watchlistRow).toEqual({ season: null, episode: null });
+                            done();
+                        });
+                    });
+                });
             });
         });
     });
@@ -424,7 +531,7 @@ describe('updateItem with invalid data', () => {
         }
     );
 
-    test.each([-1, 2, 99, 0.5, 'film', '1', null, undefined, NaN])(
+    test.each([-1, 3, 99, 0.5, 'film', '1', null, undefined, NaN])(
         'should reject an update with the invalid type %p',
         (type, done) => {
             expectUpdateRejected({ type }, done);
@@ -444,6 +551,10 @@ describe('updateItem with invalid data', () => {
             expectUpdateRejected({ title }, done);
         }
     );
+
+    test('should reject an update with an episode but no season', (done) => {
+        expectUpdateRejected({ type: 2, episode: 1 }, done);
+    });
 
     test('should not modify anything when the id does not exist', (done) => {
         checker.updateItem(db, validItem({ id: 9999 }), (err, changes) => {
