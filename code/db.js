@@ -1,5 +1,11 @@
 const sqlite3 = require('sqlite3').verbose();
 
+/**
+ * Opens a SQLite database, creating the file if it does not exist.
+ *
+ * @param {string} [dbPath='./filmTracker.db'] - Database file path; `:memory:` opens an in-memory database.
+ * @returns {import('sqlite3').Database} The database connection.
+ */
 const connectToDB = function(dbPath = './filmTracker.db') {
     return new sqlite3.Database(dbPath, sqlite3.OPEN_READWRITE | sqlite3.OPEN_CREATE, 
         (err) => {
@@ -12,6 +18,11 @@ const connectToDB = function(dbPath = './filmTracker.db') {
     );
 };
 
+/**
+ * Closes a database connection and reports any close error to the console.
+ *
+ * @param {import('sqlite3').Database} db - The connection to close.
+ */
 const closeDB = function(db) {
     db.close((err) => {
         if (err) {
@@ -21,6 +32,12 @@ const closeDB = function(db) {
     });
 };
 
+/**
+ * Creates the watch-items table and adds season/episode columns to legacy tables.
+ *
+ * @param {import('sqlite3').Database} db - The database to initialize.
+ * @param {(error: Error|null) => void} [callback] - Called after initialization completes.
+ */
 const initDB = function(db, callback = (err) => {
     if (err) {
         console.error('Database initialization error:', err.message);
@@ -117,6 +134,13 @@ const reject = (callback, error) => {
     process.nextTick(() => callback(error, 0));
 };
 
+/**
+ * Retrieves items for one section of the application in ID order.
+ *
+ * @param {import('sqlite3').Database} db - The database to query.
+ * @param {0|1} watchlist - `0` selects main-page items; `1` selects watchlist items.
+ * @param {(error: Error|null, rows?: object[]) => void} callback - Receives the query error and matching rows.
+ */
 const getItems = function(db, watchlist, callback) {
     db.all(
         'SELECT * FROM watch_items WHERE watchlist = ? ORDER BY id',
@@ -125,6 +149,13 @@ const getItems = function(db, watchlist, callback) {
     );
 };
 
+/**
+ * Validates and inserts a watch item.
+ *
+ * @param {import('sqlite3').Database} db - The database to update.
+ * @param {object} item - Item fields: title, description, rate (0-5), type (0-2), watchlist (0 or 1), and optional season/episode.
+ * @param {(error: Error|null, id: number|null) => void} callback - Receives the insert error and new row ID.
+ */
 const addItem = function(db, item, callback) {
     const error = validateItem(item);
     if (error) {
@@ -140,6 +171,13 @@ const addItem = function(db, item, callback) {
     );
 };
 
+/**
+ * Deletes an item only when it belongs to the watchlist.
+ *
+ * @param {import('sqlite3').Database} db - The database to update.
+ * @param {number} id - ID of the item to delete.
+ * @param {(error: Error|null, changes: number) => void} callback - Receives the delete error and affected-row count.
+ */
 const deleteItem = function(db, id, callback) {
     db.run(
         'DELETE FROM watch_items WHERE id = ? AND watchlist = 1',
@@ -150,6 +188,13 @@ const deleteItem = function(db, id, callback) {
     );
 };
 
+/**
+ * Validates and updates an existing watch item.
+ *
+ * @param {import('sqlite3').Database} db - The database to update.
+ * @param {object} item - Updated item fields, including a positive integer `id`.
+ * @param {(error: Error|null, changes: number) => void} callback - Receives the update error and affected-row count.
+ */
 const updateItem = function(db, item, callback) {
     const error = validateItem(item, true);
     if (error) {
@@ -165,6 +210,15 @@ const updateItem = function(db, item, callback) {
     );
 };
 
+/**
+ * Updates season and episode progress for a series on the main page.
+ *
+ * @param {import('sqlite3').Database} db - The database to update.
+ * @param {number} id - Positive ID of the series.
+ * @param {number|null} season - Positive season number, or `null` to clear progress.
+ * @param {number|null} episode - Positive episode number, or `null`; an episode requires a season.
+ * @param {(error: Error|null, changes: number) => void} callback - Receives the update error and affected-row count.
+ */
 const updateSeriesProgress = function(db, id, season, episode, callback) {
     if (!Number.isInteger(id) || id <= 0) {
         return reject(callback, validationError('id must be a positive integer'));
